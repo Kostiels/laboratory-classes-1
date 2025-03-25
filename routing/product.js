@@ -1,14 +1,95 @@
-// 📦 Zaimportuj moduły 'fs' oraz 'STATUS_CODE' do obsługi produktów.
+const fs = require("fs")
+const { STATUS_CODE } = require("../constants/statusCode")
 
-// 🏗 Stwórz funkcję 'productRouting', która obsłuży żądania dotyczące produktów.
+function showAddProductForm(response) {
+  response.setHeader("Content-Type", "text/html")
+  response.write("<html>")
+  response.write("<head><title>Shop – Add product</title></head>")
+  response.write("<body>")
+  response.write("<h1>Add product</h1>")
+  response.write("<nav>")
+  response.write('<a href="/">Home</a> | ')
+  response.write('<a href="/product/new">Newest product</a> | ')
+  response.write('<a href="/logout">Logout</a>')
+  response.write("</nav>")
+  response.write('<form method="POST" action="/product/add">')
+  response.write('<label for="name">Name:</label>')
+  response.write('<input type="text" name="name" />')
+  response.write("<br/><br/>")
+  response.write('<label for="description">Description:</label>')
+  response.write('<input type="text" name="description" />')
+  response.write("<br/><br/>")
+  response.write('<button type="submit">Add product</button>')
+  response.write("</form>")
+  response.write("</body>")
+  response.write("</html>")
+  response.end()
+}
 
-// 🏗 Stwórz funkcję 'renderAddProductPage', która wyrenderuje stronę dodawania produktu.
+function addNewProduct(request, response) {
+  const body = []
+  request.on("data", chunk => {
+    body.push(chunk)
+  })
+  request.on("end", () => {
+    const parsedBody = Buffer.concat(body).toString()
+    const formFields = parsedBody.split("&")
+    const nameValue = decodeURIComponent(formFields[0].split("=")[1])
+    const descValue = decodeURIComponent(formFields[1].split("=")[1])
+    fs.writeFile("product.txt", `Name: ${nameValue}, Description: ${descValue}`, err => {
+      if (err) {
+        response.statusCode = 500
+        response.end("Server error")
+        return
+      }
+      response.statusCode = STATUS_CODE.FOUND
+      response.setHeader("Location", "/product/new")
+      response.end()
+    })
+  })
+}
 
-// 🏗 Stwórz funkcję 'renderNewProductPage', która wyświetli najnowszy produkt z pliku 'product.txt'.
-// Podpowiedź: fileSystem.readFile(...);
+function showNewestProduct(response) {
+  response.setHeader("Content-Type", "text/html")
+  response.write("<html>")
+  response.write("<head><title>Shop – Newest product</title></head>")
+  response.write("<body>")
+  response.write("<h1>Newest product</h1>")
+  response.write("<nav>")
+  response.write('<a href="/">Home</a> | ')
+  response.write('<a href="/product/add">Add product</a> | ')
+  response.write('<a href="/logout">Logout</a>')
+  response.write("</nav>")
+  fs.readFile("product.txt", "utf-8", (err, data) => {
+    if (err) {
+      response.write("<p>No new product</p>")
+      response.write("</body></html>")
+      response.end()
+      return
+    }
+    response.write(`<p>${data}</p>`)
+    response.write("</body></html>")
+    response.end()
+  })
+}
 
-// 🏗 Stwóz funkcję 'addNewProduct', która obsłuży dodawanie nowego produktu, zapisywanie go do pliku 'product.txt' oraz przeniesie użytkownika na stronę '/product/new'.
-// Podpowiedź: fileSystem.writeFile(...);
-// Podpowiedź: response.setHeader("Location", "/product/new");
+function productRouting(request, response) {
+  const { url, method } = request
+  if (url === "/product/add" && method === "GET") {
+    return showAddProductForm(response)
+  }
+  if (url === "/product/add" && method === "POST") {
+    return addNewProduct(request, response)
+  }
+  if (url === "/product/new" && method === "GET") {
+    return showNewestProduct(response)
+  }
+  response.statusCode = STATUS_CODE.NOT_FOUND
+  response.setHeader("Content-Type", "text/html")
+  response.write("<html><body><h1>404 - Not Found</h1></body></html>")
+  response.end()
+}
 
-// 🔧 Wyeksportuj funkcję 'productRouting', aby inne moduł mogły jej używać.
+module.exports = {
+  productRouting
+}
